@@ -21,7 +21,7 @@ static inline uint64_t rotl(const uint64_t x, int k) {
 }
 
 
-static uint64_t s[4] = {1, 1, 1, 1};
+static uint64_t s[4] = {684684,6546843,219681,468984};
 
 uint64_t next(void) {
 	const uint64_t result = rotl(s[0] + s[3], 23) + s[0];
@@ -41,7 +41,7 @@ uint64_t next(void) {
 }
 
 template <size_t N, size_t ITERS=8>
-void next_permutation(size_t (&p)[N]) {
+void next_perm(size_t (&p)[N]) {
    for (int i=0; i<N; i++)
       p[i] = i;
    for (int iter=0; iter<ITERS; iter++) {
@@ -55,9 +55,9 @@ void next_permutation(size_t (&p)[N]) {
 }
 
 template <size_t D, size_t N>
-void next_color_idxs(const im::pixel (&colors)[D], im::pixel (&c)[N]) {
+void next_color(const im::pixel (&colors)[D], im::pixel (&c)[N]) {
    for (int i=0; i<N; i++)
-      ci[i] = colors[next() % D];
+      c[i] = colors[next() % D];
 }
 
 template<size_t w, size_t l, size_t t=3>
@@ -69,10 +69,10 @@ struct bg_painter {
    }
 };
 
-template <size_t lw, size_t sep, size_t sl>
+template <size_t lw, size_t sep, size_t sl, size_t bw=3>
 im::image<2*lw + 3*sep, 2*lw + 3*sep> piece(size_t (&p)[4], im::pixel (&c)[4]) {
    static const int n = 2*lw + 3*sep;
-   static auto bg = bg_painter<n, n>();
+   static auto bg = bg_painter<n, n, bw>();
    size_t p_inv[4];
    for (int d=0; d<4; d++)
       p_inv[p[d]] = d;
@@ -383,8 +383,165 @@ void path_main() {
 
 }
 
+
+template <int N>
+void inv_perm(const size_t (&p1)[N], size_t (&p2)[N]) {
+    for (int i=0; i<N; i++)
+        p2[p1[i]] = i;
+}
+
+im::pixel rot_color(im::pixel color) {
+    im::pixel ret = color;
+    std::swap(ret.r, ret.g);
+    std::swap(ret.r, ret.b);
+    return ret;
+}
+
 int sft_main() {
+   const size_t lw = 2;
+   const size_t sep = 5;
+   const size_t sl = 2;
+   const size_t bw = 0;
+   const size_t ps = 3*sep + 2*lw;
+   const size_t n = 300;
+   const size_t m = 300;
+   const size_t w = n*ps;
+   const size_t h = m*ps;
+
+   im::image<w, h> pattern;
+
+   const size_t D = 3;
+   im::pixel colors[D] = {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}};
+
+   size_t pieces[n][m][4];
+   size_t inv_pieces[n][m][4];
+   im::pixel pcolors[n][m][4];
    
+   next_perm<4>(pieces[0][0]);
+   inv_perm<4>(pieces[0][0], inv_pieces[0][0]);
+   next_color<D, 4>(colors, pcolors[0][0]);
+   //auto pattern_piece = piece<lw, sep, sl>(pieces[0][0], pcolors[0][0]);
+   //pattern._image.view(0, 0, ps, ps).paint(pattern_piece);
+
+   // top row
+   for (int i=1; i<n; i++) {
+      do {
+         next_perm<4>(pieces[i][0]);
+         inv_perm<4>(pieces[i][0], inv_pieces[i][0]);
+      } while (pieces[i][0][3] == 3 and pieces[i-1][0][1] != 1 and pcolors[i-1][0][1] != rot_color(rot_color(pcolors[i-1][0][inv_pieces[i-1][0][1]])));
+      next_color<D, 4>(colors, pcolors[i][0]);
+      pcolors[i][0][3] = rot_color(pcolors[i-1][0][inv_pieces[i-1][0][1]]);
+      pcolors[i][0][inv_pieces[i][0][3]] = rot_color(rot_color(pcolors[i-1][0][1]));
+
+      //auto pattern_piece = piece<lw, sep, sl>(pieces[i][0], pcolors[i][0]);
+      //pattern._image.view(i*ps, 0, ps, ps).paint(pattern_piece);
+   }
+
+   // left col
+   for (int j=1; j<m; j++) {
+      do {
+         next_perm<4>(pieces[0][j]);
+         inv_perm<4>(pieces[0][j], inv_pieces[0][j]);
+      } while (pieces[0][j][0] == 0 and pieces[0][j-1][2] != 2 and pcolors[0][j-1][2] != rot_color(rot_color(pcolors[0][j-1][inv_pieces[0][j-1][2]])));
+      next_color<D, 4>(colors, pcolors[0][j]);
+      pcolors[0][j][0] = rot_color(pcolors[0][j-1][inv_pieces[0][j-1][2]]);
+      pcolors[0][j][inv_pieces[0][j][0]] = rot_color(rot_color(pcolors[0][j-1][2]));
+
+      //auto pattern_piece = piece<lw, sep, sl>(pieces[0][j], pcolors[0][j]);
+      //pattern._image.view(0, j*ps, ps, ps).paint(pattern_piece);
+   }
+
+   // rest
+   for (int i=1; i<n; i++) {
+      for (int j=1; j<m; j++) {
+         do {
+            next_perm<4>(pieces[i][j]);
+            inv_perm<4>(pieces[i][j], inv_pieces[i][j]);
+         } while (not(
+            (
+                (pieces[i][j][0] != 0 and pieces[i][j][0] != 3) or
+                (pieces[i][j][0] == 0 and pieces[i][j-1][2] == 2) or
+                (pieces[i][j][0] == 0 and pcolors[i][j-1][2] == rot_color(rot_color(pcolors[i][j-1][inv_pieces[i][j-1][2]]))) or
+                (pieces[i][j][0] == 3 and pcolors[i-1][j][1] == rot_color(rot_color(pcolors[i][j-1][inv_pieces[i][j-1][2]])))
+            )
+            and
+            (
+                (pieces[i][j][3] != 0 and pieces[i][j][3] != 3) or
+                (pieces[i][j][3] == 3 and pieces[i-1][j][1] == 1) or
+                (pieces[i][j][3] == 3 and pcolors[i-1][j][1] == rot_color(rot_color(pcolors[i-1][j][inv_pieces[i-1][j][1]]))) or
+                (pieces[i][j][3] == 0 and pcolors[i][j-1][2] == rot_color(rot_color(pcolors[i-1][j][inv_pieces[i-1][j][1]])))
+            )
+         ));
+         next_color<D, 4>(colors, pcolors[i][j]);
+         pcolors[i][j][0] = rot_color(pcolors[i][j-1][inv_pieces[i][j-1][2]]);
+         pcolors[i][j][inv_pieces[i][j][0]] = rot_color(rot_color(pcolors[i][j-1][2]));
+         pcolors[i][j][3] = rot_color(pcolors[i-1][j][inv_pieces[i-1][j][1]]);
+         pcolors[i][j][inv_pieces[i][j][3]] = rot_color(rot_color(pcolors[i-1][j][1]));
+
+         //auto pattern_piece = piece<lw, sep, sl>(pieces[i][j], pcolors[i][j]);
+         //pattern._image.view(i*ps, j*ps, ps, ps).paint(pattern_piece);
+         //pattern.write("test.png");
+      }
+   }
+
+   /*
+   for (int i=0; i<n; i++) {
+      for (int j=0; j<m; j++) {
+         auto pattern_piece = piece<lw, sep, sl, bw>(pieces[i][j], pcolors[i][j]);
+         pattern._image.view(i*ps, j*ps, ps, ps).paint(pattern_piece);
+      }
+   }
+   pattern.write("test.png");
+   */
+
+   // Shuffling
+   std::cout << "shuffling" << std::endl;
+   const int pn = 3;
+   const int pd = 5;
+   for (int i=0; i<n; i++) {
+      for (int j=0; j<m; j++) {
+         for (int x=0; x<3; x++) {
+            for (int y=x+1; y<4; y++) {
+               if (pcolors[i][j][x] == pcolors[i][j][y]) {
+                  if (pieces[i][j][x] == x) {
+                     int dx = -1 + 2*(x/2);
+                     int xop = (x + 2) % 4;
+                     if (x%2==0 and (0 <= j+dx) and (j+dx < m) and pieces[i][j+dx][xop] == xop)
+                        goto nextx;
+                     if (x%2==1 and (0 <= i-dx) and (i-dx < n) and pieces[i-dx][j][xop] == xop)
+                        goto nextx;
+                  }
+                  if (pieces[i][j][y] == y) {
+                     int dy = -1 + 2*(y/2);
+                     int yop = (y + 2) % 4;
+                     if (y%2==0 and (0 <= j+dy) and (j+dy < m) and pieces[i][j+dy][yop] == yop)
+                        continue;
+                     if (y%2==1 and (0 <= i-dy) and (i-dy < n) and pieces[i-dy][j][yop] == yop)
+                        continue;
+                  }
+ 
+                  if ((next() % pd) < pn) {
+                     std::swap(pieces[i][j][x], pieces[i][j][y]);
+                     //goto nextpiece;
+                  }
+               }
+            }
+            nextx:;
+         }
+         nextpiece:;
+      }
+   }
+
+   for (int i=0; i<n; i++) {
+      for (int j=0; j<m; j++) {
+         auto pattern_piece = piece<lw, sep, sl, bw>(pieces[i][j], pcolors[i][j]);
+         pattern._image.view(i*ps, j*ps, ps, ps).paint(pattern_piece);
+      }
+   }
+
+   pattern.write("rand-sft.png");
+
+   return 0;
 }
 
 int main() {
