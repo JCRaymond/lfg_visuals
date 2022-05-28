@@ -398,9 +398,9 @@ im::pixel rot_color(im::pixel color) {
 }
 
 int sft_main() {
-   const size_t lw = 2;
-   const size_t sep = 5;
-   const size_t sl = 2;
+   const size_t lw = 6;
+   const size_t sep = 18;
+   const size_t sl = 8;
    const size_t bw = 0;
    const size_t ps = 3*sep + 2*lw;
    const size_t n = 300;
@@ -495,7 +495,6 @@ int sft_main() {
    */
 
    // Shuffling
-   std::cout << "shuffling" << std::endl;
    const int pn = 3;
    const int pd = 5;
    for (int i=0; i<n; i++) {
